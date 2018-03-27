@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <stdexcept>
+#include <vector>
 #include <list>
 #include <memory>
 #include "../vendor/variant.hpp"
