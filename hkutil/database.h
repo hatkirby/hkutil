@@ -42,15 +42,23 @@ namespace hatkirby {
     create
   };
 
+  using blob_type = std::vector<unsigned char>;
+
   using binding =
     mpark::variant<
       std::string,
-      int>;
+      int,
+      double,
+      std::nullptr_t,
+      blob_type>;
 
   using column =
     std::tuple<
       std::string,
       binding>;
+
+  using row =
+    std::vector<binding>;
 
   class database {
   public:
@@ -102,22 +110,21 @@ namespace hatkirby {
 
     void execute(std::string query)
     {
-      sqlite3_stmt* ppstmt;
+      sqlite3_stmt* tempStmt;
 
       if (sqlite3_prepare_v2(
         ppdb_.get(),
         query.c_str(),
         query.length(),
-        &ppstmt,
+        &tempStmt,
         NULL) != SQLITE_OK)
       {
         throw sqlite3_error("Error writing to database", ppdb_.get());
       }
 
-      int result = sqlite3_step(ppstmt);
-      sqlite3_finalize(ppstmt);
+      ppstmt_type ppstmt(tempStmt);
 
-      if (result != SQLITE_DONE)
+      if (sqlite3_step(ppstmt.get()) != SQLITE_DONE)
       {
         throw sqlite3_error("Error writing to database", ppdb_.get());
       }
@@ -147,48 +154,150 @@ namespace hatkirby {
 
       std::string query_str = query.str();
 
-      sqlite3_stmt* ppstmt;
+      sqlite3_stmt* tempStmt;
 
       if (sqlite3_prepare_v2(
         ppdb_.get(),
         query_str.c_str(),
         query_str.length(),
-        &ppstmt,
+        &tempStmt,
         NULL) != SQLITE_OK)
       {
         throw sqlite3_error("Error writing to database", ppdb_.get());
       }
 
+      ppstmt_type ppstmt(tempStmt);
+
       int i = 1;
       for (const column& c : columns)
       {
-        const binding& b = std::get<1>(c);
-
-        if (mpark::holds_alternative<int>(b))
-        {
-          sqlite3_bind_int(ppstmt, i, mpark::get<int>(b));
-        } else if (mpark::holds_alternative<std::string>(b))
-        {
-          const std::string& arg = mpark::get<std::string>(b);
-
-          sqlite3_bind_text(
-            ppstmt,
-            i,
-            arg.c_str(),
-            arg.length(),
-            SQLITE_TRANSIENT);
-        }
+        bindToStmt(ppstmt, i, std::get<1>(c));
 
         i++;
       }
 
-      int result = sqlite3_step(ppstmt);
-      sqlite3_finalize(ppstmt);
-
-      if (result != SQLITE_DONE)
+      if (sqlite3_step(ppstmt.get()) != SQLITE_DONE)
       {
         throw sqlite3_error("Error writing to database", ppdb_.get());
       }
+    }
+
+    std::vector<row> queryAll(
+      std::string queryString,
+      std::list<binding> bindings)
+    {
+      sqlite3_stmt* tempStmt;
+
+      if (sqlite3_prepare_v2(
+        ppdb_.get(),
+        queryString.c_str(),
+        queryString.length(),
+        &tempStmt,
+        NULL) != SQLITE_OK)
+      {
+        throw sqlite3_error("Error preparing query", ppdb_.get());
+      }
+
+      ppstmt_type ppstmt(tempStmt);
+
+      int i = 1;
+      for (const binding& value : bindings)
+      {
+        bindToStmt(ppstmt, i, value);
+
+        i++;
+      }
+
+      std::vector<row> result;
+
+      while (sqlite3_step(ppstmt.get()) == SQLITE_ROW)
+      {
+        row curRow;
+
+        int cols = sqlite3_column_count(ppstmt.get());
+
+        for (int i = 0; i < cols; i++)
+        {
+          switch (sqlite3_column_type(ppstmt.get(), i))
+          {
+            case SQLITE_INTEGER:
+            {
+              curRow.emplace_back(sqlite3_column_int(ppstmt.get(), i));
+
+              break;
+            }
+
+            case SQLITE_TEXT:
+            {
+              curRow.emplace_back(
+                std::string(
+                  reinterpret_cast<const char*>(
+                    sqlite3_column_text(ppstmt.get(), i))));
+
+              break;
+            }
+
+            case SQLITE_FLOAT:
+            {
+              curRow.emplace_back(sqlite3_column_double(ppstmt.get(), i));
+
+              break;
+            }
+
+            case SQLITE_NULL:
+            {
+              curRow.emplace_back(nullptr);
+
+              break;
+            }
+
+            case SQLITE_BLOB:
+            {
+              int len = sqlite3_column_bytes(ppstmt.get(), i);
+
+              blob_type value(len);
+
+              memcpy(
+                value.data(),
+                sqlite3_column_blob(ppstmt.get(), i),
+                len);
+
+                curRow.emplace_back(std::move(value));
+
+              break;
+            }
+
+            default:
+            {
+              // Impossible
+
+              break;
+            }
+          }
+        }
+
+        result.emplace_back(std::move(curRow));
+      }
+
+      return result;
+    }
+
+    row queryFirst(
+      std::string queryString,
+      std::list<binding> bindings)
+    {
+      std::vector<row> dataset = queryAll(
+        std::move(queryString),
+        std::move(bindings));
+
+      if (dataset.empty())
+      {
+        throw std::logic_error("Query returned empty dataset");
+      }
+
+      row result = std::move(dataset.front());
+
+      return result;
     }
 
   private:
@@ -202,7 +311,75 @@ namespace hatkirby {
       }
     };
 
+    class stmt_deleter {
+    public:
+
+      void operator()(sqlite3_stmt* ptr) const
+      {
+        sqlite3_finalize(ptr);
+      }
+    };
+
     using ppdb_type = std::unique_ptr<sqlite3, sqlite3_deleter>;
+    using ppstmt_type = std::unique_ptr<sqlite3_stmt, stmt_deleter>;
+
+    void bindToStmt(
+      const ppstmt_type& ppstmt,
+      int i,
+      const binding& value)
+    {
+      if (mpark::holds_alternative<int>(value))
+      {
+        if (sqlite3_bind_int(
+          ppstmt.get(),
+          i,
+          mpark::get<int>(value)) != SQLITE_OK)
+        {
+          throw sqlite3_error("Error preparing statement", ppdb_.get());
+        }
+      } else if (mpark::holds_alternative<std::string>(value))
+      {
+        const std::string& arg = mpark::get<std::string>(value);
+
+        if (sqlite3_bind_text(
+          ppstmt.get(),
+          i,
+          arg.c_str(),
+          arg.length(),
+          SQLITE_TRANSIENT) != SQLITE_OK)
+        {
+          throw sqlite3_error("Error preparing statement", ppdb_.get());
+        }
+      } else if (mpark::holds_alternative<double>(value))
+      {
+        if (sqlite3_bind_double(
+          ppstmt.get(),
+          i,
+          mpark::get<double>(value)) != SQLITE_OK)
+        {
+          throw sqlite3_error("Error preparing statement", ppdb_.get());
+        }
+      } else if (mpark::holds_alternative<std::nullptr_t>(value))
+      {
+        if (sqlite3_bind_null(ppstmt.get(), i) != SQLITE_OK)
+        {
+          throw sqlite3_error("Error preparing statement", ppdb_.get());
+        }
+      } else if (mpark::holds_alternative<blob_type>(value))
+      {
+        const blob_type& arg = mpark::get<blob_type>(value);
+
+        if (sqlite3_bind_blob(
+          ppstmt.get(),
+          i,
+          arg.data(),
+          arg.size(),
+          SQLITE_TRANSIENT) != SQLITE_OK)
+        {
+          throw sqlite3_error("Error preparing statement", ppdb_.get());
+        }
+      }
+    }
 
     ppdb_type ppdb_;
 
