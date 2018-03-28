@@ -113,17 +113,19 @@ namespace hatkirby {
     {
       sqlite3_stmt* tempStmt;
 
-      if (sqlite3_prepare_v2(
+      int ret = sqlite3_prepare_v2(
         ppdb_.get(),
         query.c_str(),
         query.length(),
         &tempStmt,
-        NULL) != SQLITE_OK)
+        NULL);
+
+      ppstmt_type ppstmt(tempStmt);
+
+      if (ret != SQLITE_OK)
       {
         throw sqlite3_error("Error writing to database", ppdb_.get());
       }
-
-      ppstmt_type ppstmt(tempStmt);
 
       if (sqlite3_step(ppstmt.get()) != SQLITE_DONE)
       {
@@ -157,17 +159,19 @@ namespace hatkirby {
 
       sqlite3_stmt* tempStmt;
 
-      if (sqlite3_prepare_v2(
+      int ret = sqlite3_prepare_v2(
         ppdb_.get(),
         query_str.c_str(),
         query_str.length(),
         &tempStmt,
-        NULL) != SQLITE_OK)
+        NULL);
+
+      ppstmt_type ppstmt(tempStmt);
+
+      if (ret != SQLITE_OK)
       {
         throw sqlite3_error("Error writing to database", ppdb_.get());
       }
-
-      ppstmt_type ppstmt(tempStmt);
 
       int i = 1;
       for (const column& c : columns)
@@ -191,17 +195,19 @@ namespace hatkirby {
     {
       sqlite3_stmt* tempStmt;
 
-      if (sqlite3_prepare_v2(
+      int ret = sqlite3_prepare_v2(
         ppdb_.get(),
         queryString.c_str(),
         queryString.length(),
         &tempStmt,
-        NULL) != SQLITE_OK)
+        NULL);
+
+      ppstmt_type ppstmt(tempStmt);
+
+      if (ret != SQLITE_OK)
       {
         throw sqlite3_error("Error preparing query", ppdb_.get());
       }
-
-      ppstmt_type ppstmt(tempStmt);
 
       int i = 1;
       for (const binding& value : bindings)
