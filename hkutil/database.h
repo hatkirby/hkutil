@@ -187,7 +187,7 @@ namespace hatkirby {
 
     std::vector<row> queryAll(
       std::string queryString,
-      std::list<binding> bindings)
+      std::list<binding> bindings = {})
     {
       sqlite3_stmt* tempStmt;
 
@@ -287,7 +287,7 @@ namespace hatkirby {
 
     row queryFirst(
       std::string queryString,
-      std::list<binding> bindings)
+      std::list<binding> bindings = {})
     {
       std::vector<row> dataset = queryAll(
         std::move(queryString),
