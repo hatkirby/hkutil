@@ -131,7 +131,7 @@ namespace hatkirby {
       }
     }
 
-    void insertIntoTable(
+    uint64_t insertIntoTable(
       std::string table,
       std::list<column> columns)
     {
@@ -181,6 +181,8 @@ namespace hatkirby {
       {
         throw sqlite3_error("Error writing to database", ppdb_.get());
       }
+
+      return sqlite3_last_insert_rowid(ppdb_.get());
     }
 
     std::vector<row> queryAll(
