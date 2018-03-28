@@ -7,6 +7,7 @@
 #include <string>
 #include <stdexcept>
 #include <vector>
+#include <cstring>
 #include <list>
 #include <memory>
 #include "../vendor/variant.hpp"
