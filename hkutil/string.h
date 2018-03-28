@@ -25,6 +25,22 @@ namespace hatkirby {
     return result;
   }
 
+  inline std::string lowercase(std::string in)
+  {
+    std::string result;
+
+    std::transform(
+      std::begin(in),
+      std::end(in),
+      std::back_inserter(result),
+      [] (char ch)
+      {
+        return std::tolower(ch);
+      });
+
+    return result;
+  }
+
   template <class InputIterator>
   std::string implode(
     InputIterator first,
