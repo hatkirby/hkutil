@@ -14,6 +14,8 @@ namespace hatkirby {
   class recptr {
   public:
 
+    recptr() = default;
+
     recptr(T* ptr) : ptr_(ptr)
     {
     }
@@ -24,8 +26,11 @@ namespace hatkirby {
     }
 
     recptr(const recptr& other)
-      : ptr_(new T(*other.ptr_))
     {
+      if (other.ptr_)
+      {
+        ptr_ = new T(*other.ptr_);
+      }
     }
 
     recptr(recptr&& other)
@@ -38,9 +43,14 @@ namespace hatkirby {
       if (ptr_)
       {
         delete ptr_;
+
+        ptr_ = nullptr;
       }
 
-      ptr_ = new T(*other.ptr_);
+      if (other.ptr_)
+      {
+        ptr_ = new T(*other.ptr_);
+      }
 
       return *this;
     }
@@ -77,6 +87,11 @@ namespace hatkirby {
     const T* operator->() const
     {
       return ptr_;
+    }
+
+    operator bool() const
+    {
+      return (ptr_ != nullptr);
     }
 
   private:
