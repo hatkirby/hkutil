@@ -10,7 +10,7 @@
 #include <cstring>
 #include <list>
 #include <memory>
-#include "../vendor/variant.hpp"
+#include <variant>
 #include "string.h"
 
 namespace hatkirby {
@@ -47,7 +47,7 @@ namespace hatkirby {
   using blob_type = std::vector<unsigned char>;
 
   using binding =
-    mpark::variant<
+    std::variant<
       std::string,
       int,
       double,
@@ -338,18 +338,18 @@ namespace hatkirby {
       int i,
       const binding& value)
     {
-      if (mpark::holds_alternative<int>(value))
+      if (std::holds_alternative<int>(value))
       {
         if (sqlite3_bind_int(
           ppstmt.get(),
           i,
-          mpark::get<int>(value)) != SQLITE_OK)
+          std::get<int>(value)) != SQLITE_OK)
         {
           throw sqlite3_error("Error preparing statement", ppdb_.get());
         }
-      } else if (mpark::holds_alternative<std::string>(value))
+      } else if (std::holds_alternative<std::string>(value))
       {
-        const std::string& arg = mpark::get<std::string>(value);
+        const std::string& arg = std::get<std::string>(value);
 
         if (sqlite3_bind_text(
           ppstmt.get(),
@@ -360,24 +360,24 @@ namespace hatkirby {
         {
           throw sqlite3_error("Error preparing statement", ppdb_.get());
         }
-      } else if (mpark::holds_alternative<double>(value))
+      } else if (std::holds_alternative<double>(value))
       {
         if (sqlite3_bind_double(
           ppstmt.get(),
           i,
-          mpark::get<double>(value)) != SQLITE_OK)
+          std::get<double>(value)) != SQLITE_OK)
         {
           throw sqlite3_error("Error preparing statement", ppdb_.get());
         }
-      } else if (mpark::holds_alternative<std::nullptr_t>(value))
+      } else if (std::holds_alternative<std::nullptr_t>(value))
       {
         if (sqlite3_bind_null(ppstmt.get(), i) != SQLITE_OK)
         {
           throw sqlite3_error("Error preparing statement", ppdb_.get());
         }
-      } else if (mpark::holds_alternative<blob_type>(value))
+      } else if (std::holds_alternative<blob_type>(value))
       {
-        const blob_type& arg = mpark::get<blob_type>(value);
+        const blob_type& arg = std::get<blob_type>(value);
 
         if (sqlite3_bind_blob(
           ppstmt.get(),
