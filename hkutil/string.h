@@ -62,6 +62,14 @@ namespace hatkirby {
     return result.str();
   }
 
+  template <class Container>
+  std::string implode(
+    const Container& container,
+    std::string delimiter)
+  {
+    return implode(container.begin(), container.end(), delimiter);
+  }
+
   template <class OutputIterator>
   void split(
     std::string input,
