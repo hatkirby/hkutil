@@ -194,6 +194,11 @@ namespace hatkirby {
       std::string queryString,
       std::list<binding> bindings = {})
     {
+      if (timeout_ > 0)
+      {
+        deadline_ = static_cast<long long>(std::time(nullptr)) + timeout_;
+      }
+
       sqlite3_stmt* tempStmt;
 
       int ret = sqlite3_prepare_v2(
@@ -310,6 +315,22 @@ namespace hatkirby {
       return result;
     }
 
+    void setTimeout(int seconds)
+    {
+      timeout_ = seconds;
+      if (timeout_ > 0)
+      {
+        sqlite3_progress_handler(ppdb_.get(), 1000, [](void* db){
+          if (static_cast<long long>(std::time(nullptr)) > static_cast<database*>(db)->deadline_) {
+            return 1;
+          }
+          return 0;
+        }, this);
+      } else {
+        sqlite3_progress_handler(ppdb_.get(), 0, nullptr, nullptr);
+      }
+    }
+
   private:
 
     class sqlite3_deleter {
@@ -392,6 +413,8 @@ namespace hatkirby {
     }
 
     ppdb_type ppdb_;
+    long long timeout_ = -1;
+    long long deadline_ = 0;
 
   };
 
